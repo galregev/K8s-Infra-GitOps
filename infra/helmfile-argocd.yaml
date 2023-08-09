@@ -1,0 +1,25 @@
+
+### Definition of the helm-file repositories
+repositories:
+- name: argo-cd
+  url: https://argoproj.github.io/argo-helm
+
+environments:
+  k3s:
+    values:
+    - ./values/{{ .Environment.Name }}/argocd/argocd.yaml
+    secrets:
+    - ./values/{{ .Environment.Name }}/argocd/argocd-secrets.yaml
+  oci:
+    values:
+    - ./values/{{ .Environment.Name }}/argocd/values.yaml
+    secrets:
+    - ./values/{{ .Environment.Name }}/argocd/secrets.yaml
+
+releases:
+- name: argocd
+  namespace: "{{`{{ .Release.Name }}`}}"
+  chart: argo/argo-cd
+  version: 5.43.2
+  values:
+  - ./values/common-argocd.yaml.gotmpl

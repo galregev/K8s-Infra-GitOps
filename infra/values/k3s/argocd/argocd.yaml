@@ -1,0 +1,82 @@
+argocd:
+  repoServer:
+    replicas: 1
+    volumes:
+      - name: custom-tools
+        emptyDir: {}
+      - name: helm-data-home
+        emptyDir: {}
+      - name: sops-tool
+        emptyDir: {}
+
+    serviceAccount:
+      create: true
+      name: "argocd-repo-server"
+
+    rbac:
+      - apiGroups:
+          - argoproj.io
+        resources:
+          - applications
+        verbs:
+          - get
+          - list
+          - watch
+
+    initContainers:
+      - name: download-tools
+        image: alpine/helm:3.7.1
+        command: [sh, -c]
+        env:
+          - name: HELM_DATA_HOME
+            value: /helm/data
+        args:
+          - wget -qO /custom-tools/argo-cd-helmfile.sh https://raw.githubusercontent.com/travisghansen/argo-cd-helmfile/master/src/argo-cd-helmfile.sh &&
+            chmod +x /custom-tools/argo-cd-helmfile.sh &&
+            wget -qO /custom-tools/helmfile https://github.com/roboll/helmfile/releases/download/v0.142.0/helmfile_linux_amd64 &&
+            chmod +x /custom-tools/helmfile &&
+
+            wget -qO sops https://github.com/mozilla/sops/releases/download/v3.7.1/sops-v3.7.1.linux && chmod +x sops && mv sops /sops &&
+
+            [[ ! -d "${HELM_DATA_HOME}/plugins/helm-secrets" ]] && helm plugin install https://github.com/jkroepke/helm-secrets --version 3.11.0 &&
+
+            [[ ! -d "${HELM_DATA_HOME}/plugins/helm-diff" ]] && helm plugin install https://github.com/databus23/helm-diff --version 3.4.0 &&
+
+            chown -R 999:999 "${HELM_DATA_HOME}"
+
+        volumeMounts:
+          - mountPath: /custom-tools
+            name: custom-tools
+          - mountPath: /helm/data
+            name: helm-data-home
+          - mountPath: /sops
+            name: sops-tool
+
+    volumeMounts:
+      - mountPath: /usr/local/bin/argo-cd-helmfile.sh
+        name: custom-tools
+        subPath: argo-cd-helmfile.sh
+      - mountPath: /usr/local/bin/helmfile
+        name: custom-tools
+        subPath: helmfile
+      - mountPath: /usr/local/bin/sops
+        name: sops-tool
+        subPath: sops
+      - mountPath: /home/argocd/.local/share/helm
+        name: helm-data-home
+
+  server:
+    name: server
+    replicas: 1
+    config:
+      users.anonymous.enabled: "true"
+      configManagementPlugins: |
+        - name: helmfile
+          init:
+            command: ["argo-cd-helmfile.sh"]
+            args: ["init"]
+          generate:
+            command: ["argo-cd-helmfile.sh"]
+            args: ["generate"]
+    extraArgs:
+      - --insecure

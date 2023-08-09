@@ -1,0 +1,37 @@
+crds:
+  install: true
+  keep: false
+
+projects:
+  - name: argocd-apps
+    namespace: argocd
+    description: ArgoCD Apps
+    sourceRepos:
+      - '*'
+    destinations:
+      - namespace: '*'
+        server: '*'
+    clusterResourceWhitelist:
+      - group: '*'
+        kind: '*'
+  {{- if eq .Environment.Name "k3s" }}
+  - name: k3s
+    namespace: argocd
+    description: K3S Environments
+    sourceRepos:
+      - '*'
+    destinations:
+      - namespace: '*'
+        server: '*'
+    clusterResourceWhitelist:
+      - group: '*'
+        kind: '*'
+    {{- end }}
+
+server: {{- toYaml .Values.argocd.repoServer | nindent 2 }}
+
+applicationSet:
+  enabled: false
+
+notifications:
+  enabled: false
